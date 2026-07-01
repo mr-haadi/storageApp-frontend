@@ -339,7 +339,7 @@ useEffect(() => {
         setFilesList((prev) => prev.filter((f) => String(f._id || f.id) !== itemId));
       await refreshUser();
       dirCache.delete(cacheKey);
-      addToast(`"${item.name}" ${item.isDirectory ? "folder" : "file"} deleted`, "success");
+      addToast(`"${item.name}" has been deleted`, "success");
     } catch (err) {
       addToast(getErr(err), "error");
       loadDirectory({ force: true, silent: true });

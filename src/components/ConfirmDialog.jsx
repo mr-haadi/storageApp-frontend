@@ -1,28 +1,3 @@
-/**
- * Drop-in replacement for window.confirm() / window.alert().
- *
- * Usage — confirmation:
- *   <ConfirmDialog
- *     open={!!dialog}
- *     title="Delete file?"
- *     message="This cannot be undone."
- *     confirmLabel="Delete"          // default "Confirm"
- *     confirmDanger                  // red button
- *     onConfirm={() => doDelete()}
- *     onCancel={() => setDialog(null)}
- *   />
- *
- * Usage — alert (no cancel button):
- *   <ConfirmDialog
- *     open={!!alert}
- *     title="Error"
- *     message="Something went wrong."
- *     confirmLabel="OK"
- *     alertOnly
- *     onConfirm={() => setAlert(null)}
- *     onCancel={() => setAlert(null)}
- *   />
- */
 export default function ConfirmDialog({
   open,
   icon,

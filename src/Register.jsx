@@ -303,7 +303,7 @@ export default function Register() {
               <label style={labelStyle}>
                 Verification code{" "}
                 {otpVerified && (
-                  <span style={{ color: "#34D399" }}>✓ Verified</span>
+                  <span style={{ color: "#34D399" }}>Verified</span>
                 )}
               </label>
               <div style={{ display: "flex", gap: 8 }}>
@@ -316,9 +316,9 @@ export default function Register() {
                   style={{
                     ...inputStyle,
                     flex: 1,
-                    letterSpacing: 6,
+                    letterSpacing: 5,
                     textAlign: "center",
-                    fontSize: 18,
+                    fontSize: 16,
                   }}
                   onFocus={(e) =>
                     (e.target.style.borderColor = "var(--primary)")
@@ -356,7 +356,7 @@ export default function Register() {
                       Verifying
                     </>
                   ) : otpVerified ? (
-                    "✓ Done"
+                    "Verified"
                   ) : (
                     "Verify"
                   )}
@@ -416,9 +416,9 @@ export default function Register() {
           >
             {isSubmitting && <span style={spinnerStyle} />}
             {isSuccess
-              ? "✓ Account Created!"
+              ? "Account Created"
               : isSubmitting
-                ? "Creating Account…"
+                ? "Processing…"
                 : "Create Account"}
           </button>
         </form>

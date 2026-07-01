@@ -42,7 +42,7 @@ export default function Login() {
       await refreshUser();
       navigate(redirectTo, { replace: true });
     } catch (err) {
-      setServerError(err.response?.data?.error || "Invalid email or password.");
+      setServerError(err.response?.data?.error || "Invalid email or password!");
     } finally {
       setIsLoading(false);
     }

@@ -19,7 +19,7 @@ const ToastMessage = memo(function ToastMessage({ message }) {
         whiteSpace: "nowrap",
       }}
     >
-      ✓ {message}
+      {message}
     </div>
   );
 });

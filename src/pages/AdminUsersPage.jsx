@@ -16,8 +16,10 @@ import UserStats from "../components/admin/usersPage/UserStats.jsx";
 import UserFilters from "../components/admin/usersPage/UserFilters.jsx";
 import UserTable from "../components/admin/usersPage/UserTable.jsx";
 import DeleteUserModal from "../components/admin/usersPage/DeleteUserModal.jsx";
+import ConfirmDialog from "../components/ConfirmDialog.jsx";
 
-const TABLE_COLUMNS = "minmax(180px,2fr) minmax(240px,2.3fr) 170px 120px 90px 90px";
+const TABLE_COLUMNS =
+  "minmax(180px,2fr) minmax(240px,2.3fr) 170px 120px 90px 90px";
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState([]);
@@ -37,6 +39,7 @@ export default function AdminUsersPage() {
   const isAdmin = myRole === "Admin";
   const userEmail = currentLoggedUser?.email;
   const canManageUsers = isSuperAdmin || isAdmin;
+  const [logoutTarget, setLogoutTarget] = useState(null);
 
   const showToast = (msg) => {
     setToast(msg);
@@ -80,15 +83,28 @@ export default function AdminUsersPage() {
     return () => window.removeEventListener("click", closeMenu);
   }, []);
 
-  const logoutUser = async ({ id, email }) => {
-    if (!confirm(`You're about to logout ${email === userEmail ? "yourself!" : email}`)) return;
+  const logoutUser = ({ id, email }) => {
+    setOpenMenuId(null);
+    setLogoutTarget({ id, email });
+  };
+
+  const confirmLogout = async () => {
+    if (!logoutTarget) return;
+
     try {
-      await logoutUserByAdmin(id);
+      await logoutUserByAdmin(logoutTarget.id);
+      if (logoutTarget.email === userEmail) {
+        setLogoutTarget(null);
+        navigate("/login");
+        return;
+      }
       await refreshUsers();
-      showToast(`${email} logged out`);
+      showToast(`${logoutTarget.email} logged out`);
     } catch (err) {
       console.error(err);
       showToast(getErr(err));
+    } finally {
+      setLogoutTarget(null);
     }
   };
 
@@ -146,9 +162,9 @@ export default function AdminUsersPage() {
   });
 
   const stats = {
-    total:   users.length,
-    active:  users.filter((u) => !u.isDeleted && u.isLoggedIn).length,
-    admins:  users.filter((u) => u.role === "Admin").length,
+    total: users.length,
+    active: users.filter((u) => !u.isDeleted && u.isLoggedIn).length,
+    admins: users.filter((u) => u.role === "Admin").length,
     deleted: users.filter((u) => u.isDeleted).length,
   };
 
@@ -156,12 +172,18 @@ export default function AdminUsersPage() {
     <AppLayout>
       <div style={{ padding: "24px 24px", minWidth: 0 }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-
           <ToastMessage message={toast} />
 
           {/* Header */}
           <div style={{ marginBottom: 24 }}>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>
+            <h1
+              style={{
+                fontSize: 22,
+                fontWeight: 700,
+                color: "var(--text)",
+                marginBottom: 4,
+              }}
+            >
               👥 User Management
             </h1>
             <p style={{ fontSize: 13, color: "var(--muted)" }}>
@@ -206,6 +228,22 @@ export default function AdminUsersPage() {
           user={deleteTarget}
           onClose={() => setDeleteTarget(null)}
           onConfirm={handleDelete}
+        />
+      )}
+      {logoutTarget && (
+        <ConfirmDialog
+          open={true}
+          icon="🔐"
+          title="Log out user?"
+          message={
+            logoutTarget.email === userEmail
+              ? "You're about to log yourself out from all devices."
+              : `You're about to log out ${logoutTarget.email} from all active sessions.`
+          }
+          confirmLabel="Log Out"
+          confirmDanger
+          onConfirm={confirmLogout}
+          onCancel={() => setLogoutTarget(null)}
         />
       )}
 

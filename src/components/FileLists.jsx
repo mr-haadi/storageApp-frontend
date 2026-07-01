@@ -372,7 +372,7 @@ export const FileCard = memo(function FileCard({
       >
         {isUploading ? (
           uploadPct >= 100 ? (
-            "✓ Uploaded"
+            "Uploaded"
           ) : (
             `Uploading ${Math.round(uploadPct)}%`
           )

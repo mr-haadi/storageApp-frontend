@@ -101,7 +101,6 @@ export default function GoogleAuthButton({
     fontFamily: "inherit",
     letterSpacing: "0.01em",
     lineHeight: "1.4",
-    borderRadius: "8px",
     background: "rgba(255,255,255,0.04)",
     border: "1px solid var(--border)",
     borderRadius: 9,

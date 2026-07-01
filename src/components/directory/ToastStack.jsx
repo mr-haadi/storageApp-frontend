@@ -26,7 +26,7 @@ const ToastStack = memo(function ToastStack({ toasts, onRemove }) {
             cursor: "pointer", animation: "slideInDown 0.2s ease",
           }}
         >
-          <span>{toast.type === "error" ? "⚠️" : "✓"}</span>
+          <span>{toast.type === "error" ? "⚠️" : ""}</span>
           {toast.message}
         </div>
       ))}
