@@ -4,7 +4,7 @@ import AppLayout from "../components/AppLayout";
 import { useUser } from "../context/UserContext";
 import { fetchPlansDashboard } from "../api/adminApi";
 import { getErr } from "../utils/directoryUtils";
-import ToastMessage from "../components/admin/usersPage/ToastMessage";
+import toast from "react-hot-toast";
 import PlanStats from "../components/admin/plansPage/PlanStats";
 import PlansSearchBar from "../components/admin/plansPage/PlansSearchBar";
 import ActivePlansTable from "../components/admin/plansPage/ActivePlansTable";
@@ -30,7 +30,6 @@ export default function AdminPlansPage() {
   const [data, setData] = useState(EMPTY_DASHBOARD);
   const [loading, setLoading] = useState(true);
   const [searchQ, setSearchQ] = useState("");
-  const [toast, setToast] = useState("");
 
   useEffect(() => {
     if (
@@ -43,12 +42,6 @@ export default function AdminPlansPage() {
     }
   }, [user, navigate]);
 
-  const showToast = (msg) => {
-    setToast(msg);
-    clearTimeout(window.plansToastTimer);
-    window.plansToastTimer = setTimeout(() => setToast(""), 3000);
-  };
-
   async function loadDashboard() {
     try {
       setLoading(true);
@@ -57,7 +50,7 @@ export default function AdminPlansPage() {
     } catch (err) {
       if (err.response?.status === 403) navigate("/directory");
       else if (err.response?.status === 401) navigate("/login");
-      else showToast(getErr(err));
+      else toast.error(getErr(err));
     } finally {
       setLoading(false);
     }
@@ -79,8 +72,6 @@ export default function AdminPlansPage() {
     <AppLayout>
       <div style={{ padding: "24px 24px", minWidth: 0 }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-          <ToastMessage message={toast} />
-
           {/* Header */}
           <div style={{ marginBottom: 24 }}>
             <h1

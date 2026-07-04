@@ -11,11 +11,9 @@ export async function getDirectoryPath(dirId) {
 }
 
 export const createDirectory = async (dirId = "", newDirname) => {
-  const { data } = await axiosWithCreds.post(
-    `/directory/${dirId}`,
-    {},
-    { headers: { dirname: newDirname } }
-  );
+  const { data } = await axiosWithCreds.post(`/directory/${dirId}`, {
+    dirname: newDirname
+  });
   return data;
 };
 

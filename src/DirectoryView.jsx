@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import AppLayout from "./components/AppLayout";
 import { useUser } from "./context/UserContext";
+import toast from "react-hot-toast";
 
 import {
   getDirectoryItems,
@@ -19,7 +20,7 @@ import {
 } from "./api/fileApi";
 import { bulkDeleteItems } from "./api/userApi";
 import { BASE_URL } from "./api/axiosInstances";
-import { getExt, getErr } from "./utils/directoryUtils";
+import { getExt, getErr, formatStorage } from "./utils/directoryUtils";
 import { useIsMobile } from "./hooks/useIsMobile";
 import Breadcrumbs from "./components/BreadCrumb";
 import CreateFolderModal from "./components/CreateFolderModal";
@@ -28,14 +29,26 @@ import RenameModal from "./components/RenameModal";
 import DeleteModal from "./components/DeleteModal";
 import DetailsModal from "./components/DetailsModal";
 import UploadZone from "./components/UploadZone";
+import UploadProgressBar from "./components/UploadProgressBar";
 import DirectoryToolbar from "./components/directory/DirectoryToolbar";
 import MobileActionBar from "./components/directory/MobileActionBar";
-import ToastStack from "./components/directory/ToastStack";
 import ListRefreshOverlay from "./components/directory/ListRefreshOverlay";
 import DirectoryGrid from "./components/directory/DirectoryGrid";
+import * as uploadManager from "./utils/uploadManager";
 
 // ── Module-level cache — survives navigation (unmount/remount) ────────────
 const dirCache = new Map();
+
+// ── Invalidate a directory's cache plus every ancestor up to root ─────────
+function invalidateDirAndAncestors(userId, targetDirId, breadcrumbs) {
+  if (!userId) return;
+  dirCache.delete(`${userId}:root`);
+  dirCache.delete(`${userId}:${targetDirId || "root"}`);
+  (breadcrumbs || []).forEach((crumb) => {
+    const id = crumb?._id || crumb?.id;
+    if (id) dirCache.delete(`${userId}:${id}`);
+  });
+}
 
 // ── Upload pool — pure function, no component state needed ────────────────
 function createPool(limit) {
@@ -44,7 +57,12 @@ function createPool(limit) {
   const next = () => {
     if (active >= limit || !queue.length) return;
     active++;
-    queue.shift()().finally(() => { active--; next(); });
+    queue
+      .shift()()
+      .finally(() => {
+        active--;
+        next();
+      });
     next();
   };
   return (task) =>
@@ -54,32 +72,38 @@ function createPool(limit) {
     });
 }
 
-// ── R2 XHR upload — only needs setProgressMap (passed in) ─────────────────
-function uploadFileToR2({ item, fileId, uploadUrl, setProgressMap }) {
+// ── R2 XHR upload — reports byte-level progress to the upload manager ─────
+function uploadFileToR2({ item, fileId, uploadUrl }) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", uploadUrl);
     xhr.setRequestHeader("Content-Type", item.contentType);
+    uploadManager.registerXhr(item.id, xhr, fileId);
     xhr.upload.onprogress = (evt) => {
-      if (evt.lengthComputable)
-        setProgressMap((p) => ({
-          ...p,
-          [item.id]: (evt.loaded / evt.total) * 100,
-        }));
+      if (evt.lengthComputable) uploadManager.updateItemProgress(item.id, evt.loaded);
     };
     xhr.onload = async () => {
       if (xhr.status === 200) {
-        try { await uploadComplete({ fileId }); resolve(); }
-        catch (e) { reject(e); }
+        try {
+          await uploadComplete({ fileId });
+          resolve();
+        } catch (e) {
+          reject(e);
+        }
       } else {
-        try { await uploadCancel({ fileId }); } catch {}
+        try {
+          await uploadCancel({ fileId });
+        } catch {}
         reject(new Error("Upload failed"));
       }
     };
     xhr.onerror = async () => {
-      try { await uploadCancel({ fileId }); } catch {}
+      try {
+        await uploadCancel({ fileId });
+      } catch {}
       reject(new Error("Network error"));
     };
+    xhr.onabort = () => reject(new Error("Upload cancelled"));
     xhr.send(item.file);
   });
 }
@@ -95,21 +119,10 @@ export default function DirectoryView() {
   const [filesList, setFilesList] = useState([]);
   const [breadcrumbs, setBreadcrumbs] = useState([]);
 
-  // ── toast system ───────────────────────────────────────────────────────────
-  const [toasts, setToasts] = useState([]);
-  const addToast = useCallback((message, type = "success") => {
-    const id = Date.now() + Math.random();
-    setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
-  }, []);
-  const removeToast = useCallback((id) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
-
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [listRefreshing, setListRefreshing] = useState(false);
-  const [sortBy, setSortBy] = useState("name");
+  const [sortBy, setSortBy] = useState(null);
   const [sortDir, setSortDir] = useState("asc");
   const [isDragOver, setIsDragOver] = useState(false);
   const [viewMode, setViewMode] = useState(() => {
@@ -140,12 +153,15 @@ export default function DirectoryView() {
   const [newDirname, setNewDirname] = useState("New Folder");
 
   const [showRename, setShowRename] = useState(false);
-  const [renameTarget, setRenameTarget] = useState({ type: null, id: null, value: "" });
+  const [renameTarget, setRenameTarget] = useState({
+    type: null,
+    id: null,
+    value: "",
+  });
 
   const [deleteItem, setDeleteItem] = useState(null);
   const [detailsItem, setDetailsItem] = useState(null);
 
-  const [progressMap, setProgressMap] = useState({});
   const [selectedItems, setSelectedItems] = useState([]);
   const [selectionMode, setSelectionMode] = useState(false);
   const [bulkConfirm, setBulkConfirm] = useState(false);
@@ -154,6 +170,12 @@ export default function DirectoryView() {
   const dragCounter = useRef(0);
   const processUploadRef = useRef(null);
   const cacheKey = `${user?.id}:${dirId || "root"}`;
+
+  // ── stale-closure guard ────────────────────────────────────────────────────
+  const dirIdRef = useRef(dirId);
+  useEffect(() => {
+    dirIdRef.current = dirId;
+  }, [dirId]);
 
   // ── load directory ─────────────────────────────────────────────────────────
   const loadDirectory = useCallback(
@@ -183,95 +205,138 @@ export default function DirectoryView() {
         setFilesList(files);
         setBreadcrumbs(bc);
       } catch (err) {
-        addToast(getErr(err), "error");
+        toast.error(getErr(err));
       } finally {
         setLoading(false);
         setListRefreshing(false);
       }
     },
-    [cacheKey, dirId, addToast],
+    [cacheKey, dirId],
   );
-  
-const previousUserId = useRef();
 
-useEffect(() => {
-  if (!user) {
-    dirCache.clear();
-    previousUserId.current = undefined;
-    return;
-  }
+  const previousUserId = useRef();
 
-  if (previousUserId.current !== user.id) {
-    dirCache.clear();
-    previousUserId.current = user.id;
-  }
-  loadDirectory();
-  setSelectedItems([]);
-  setSelectionMode(false);
-}, [dirId, user?.id, loadDirectory]);
+  useEffect(() => {
+    if (!user) {
+      dirCache.clear();
+      previousUserId.current = undefined;
+      return;
+    }
+
+    if (previousUserId.current !== user.id) {
+      dirCache.clear();
+      previousUserId.current = user.id;
+    }
+    loadDirectory();
+    setSelectedItems([]);
+    setSelectionMode(false);
+  }, [dirId, user?.id, loadDirectory]);
 
   useEffect(() => {
     localStorage.setItem("viewMode", viewMode);
   }, [viewMode]);
 
+  // ── react to a global "Cancel All" from the upload progress card ──────────
+  useEffect(() => {
+    return uploadManager.subscribeCancel((cancelledIds) => {
+      setFilesList((prev) => prev.filter((f) => !cancelledIds.includes(f.id)));
+    });
+  }, []);
+
   // ── drag & drop (desktop only) ─────────────────────────────────────────────
-  const onDragEnter = useCallback((e) => {
-    if (isMobile) return;
-    e.preventDefault();
-    dragCounter.current++;
-    if (e.dataTransfer.types.includes("Files")) setIsDragOver(true);
-  }, [isMobile]);
-  const onDragLeave = useCallback((e) => {
-    if (isMobile) return;
-    e.preventDefault();
-    if (--dragCounter.current === 0) setIsDragOver(false);
-  }, [isMobile]);
-  const onDragOver = useCallback((e) => {
-    if (isMobile) return;
-    e.preventDefault();
-  }, [isMobile]);
-  const onDrop = useCallback(async (e) => {
-    if (isMobile) return;
-    e.preventDefault();
-    dragCounter.current = 0;
-    setIsDragOver(false);
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length) await processUploadRef.current(files);
-  }, [isMobile]);
+  const onDragEnter = useCallback(
+    (e) => {
+      if (isMobile) return;
+      e.preventDefault();
+      dragCounter.current++;
+      if (e.dataTransfer.types.includes("Files")) setIsDragOver(true);
+    },
+    [isMobile],
+  );
+  const onDragLeave = useCallback(
+    (e) => {
+      if (isMobile) return;
+      e.preventDefault();
+      if (--dragCounter.current === 0) setIsDragOver(false);
+    },
+    [isMobile],
+  );
+  const onDragOver = useCallback(
+    (e) => {
+      if (isMobile) return;
+      e.preventDefault();
+    },
+    [isMobile],
+  );
+  const onDrop = useCallback(
+    async (e) => {
+      if (isMobile) return;
+      e.preventDefault();
+      dragCounter.current = 0;
+      setIsDragOver(false);
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length) await processUploadRef.current(files);
+    },
+    [isMobile],
+  );
 
   // ── upload ─────────────────────────────────────────────────────────────────
   async function processUpload(files) {
+    const uploadDirId = dirId;
+    const uploadBreadcrumbs = breadcrumbs;
+    const isStillHere = () => dirIdRef.current === uploadDirId;
+
+    // ── client-side quota pre-check ──────────────────────────────────────
+    const totalBytes = files.reduce((sum, f) => sum + (f.size || 0), 0);
+    const used = user?.usedStorageInBytes ?? 0;
+    const max = user?.maxStorageInBytes;
+    if (typeof max === "number" && used + totalBytes > max) {
+      const available = Math.max(max - used, 0);
+      // Upload feedback lives entirely in the global upload card now —
+      // no react-hot-toast for upload-related messages.
+      uploadManager.flashError(
+        `Not enough storage: needs ${formatStorage(totalBytes)}, only ${formatStorage(available)} available`,
+      );
+      return;
+    }
+
     try {
-      const pool = createPool(3);
-      const tempItems = files.map((file) => ({
-        file,
-        id: `temp-${Date.now()}-${Math.random()}`,
-        name: file.name,
-        size: file.size,
-        contentType: file.type,
-      }));
-      setFilesList((prev) => [...tempItems, ...prev]);
-      tempItems.forEach((f) => setProgressMap((p) => ({ ...p, [f.id]: 0 })));
+      const pool = createPool(5);
+      const tempItems = uploadManager.beginBatch(files, uploadDirId);
+      if (isStillHere()) {
+        setFilesList((prev) => [...tempItems, ...prev]);
+      }
 
       const failedIds = [];
       const results = await Promise.allSettled(
         tempItems.map((item) =>
           pool(async () => {
+            if (uploadManager.isCancelled(item.id)) {
+              failedIds.push(item.id);
+              throw new Error("Upload cancelled");
+            }
             try {
               const data = await uploadInitiate({
                 name: item.name,
                 size: item.size,
                 contentType: item.contentType,
-                parentDirId: dirId,
+                parentDirId: uploadDirId,
               });
+              if (uploadManager.isCancelled(item.id)) {
+                try {
+                  await uploadCancel({ fileId: data.fileId });
+                } catch {}
+                throw new Error("Upload cancelled");
+              }
               await uploadFileToR2({
                 item,
                 fileId: data.fileId,
                 uploadUrl: data.signedUrl,
-                setProgressMap,
               });
+              uploadManager.markItemDone(item.id);
             } catch (err) {
               failedIds.push(item.id);
+              uploadManager.markItemFailed(item.id);
               throw err;
             }
           }),
@@ -279,40 +344,34 @@ useEffect(() => {
       );
 
       const succeeded = results.filter((r) => r.status === "fulfilled");
-      const failed = results.filter((r) => r.status === "rejected");
 
-      if (failedIds.length) {
+      if (failedIds.length && isStillHere()) {
         setFilesList((prev) => prev.filter((f) => !failedIds.includes(f.id)));
-        setProgressMap((prev) => {
-          const next = { ...prev };
-          failedIds.forEach((id) => delete next[id]);
-          return next;
-        });
       }
 
-      if (failed.length) {
-        const firstError = failed[0].reason;
-        addToast(
-          firstError?.response?.data?.message ||
-            firstError?.response?.data?.error ||
-            firstError?.message ||
-            `${failed.length} file${failed.length > 1 ? "s" : ""} failed to upload`,
-          "error"
-        );
-      }
+      // Failures and cancellations are both surfaced via the global upload
+      // card itself (markItemFailed / flashError) — no toast here.
 
       if (succeeded.length) {
-        await Promise.all([
-          loadDirectory({ force: true, silent: true }),
-          refreshUser(),
-        ]);
-        addToast(
-          `${succeeded.length} file${succeeded.length > 1 ? "s" : ""} uploaded successfully`,
-          "success"
-        );
+        // Uploading changes this directory's size and every ancestor's
+        // size (up to root), so all of their caches must be invalidated —
+        // not just the current one. We reuse the breadcrumbs captured at
+        // upload start instead of re-fetching the path.
+        invalidateDirAndAncestors(user?.id, uploadDirId, uploadBreadcrumbs);
+        if (isStillHere()) {
+          await Promise.all([
+            loadDirectory({ force: true, silent: true }),
+            refreshUser(),
+          ]);
+        } else {
+          // Uploaded into a folder we've since navigated away from — the
+          // cache entries are already invalidated above, so it (and its
+          // ancestors) will simply refetch next time they're opened.
+          await refreshUser();
+        }
       }
     } catch (err) {
-      addToast(err.message || "Upload failed", "error");
+      uploadManager.flashError(err.message || "Upload failed");
     }
   }
 
@@ -328,21 +387,33 @@ useEffect(() => {
   // ── CRUD actions ───────────────────────────────────────────────────────────
   async function confirmDelete(item) {
     const itemId = String(item.id || item._id);
+    const actionDirId = dirId;
+    const actionBreadcrumbs = breadcrumbs;
     setDeleteItem(null);
     addLoadingItem(itemId);
     try {
       if (item.isDirectory) await deleteDirectory(itemId);
       else await deleteFile(itemId);
-      if (item.isDirectory)
-        setDirectoriesList((prev) => prev.filter((d) => String(d._id || d.id) !== itemId));
-      else
-        setFilesList((prev) => prev.filter((f) => String(f._id || f.id) !== itemId));
+      // Deleting a file or folder changes the size of this directory and
+      // every ancestor up to root — invalidate all of their caches so the
+      // next visit reloads fresh sizes, without refetching them now.
+      invalidateDirAndAncestors(user?.id, actionDirId, actionBreadcrumbs);
+      if (dirIdRef.current === actionDirId) {
+        if (item.isDirectory)
+          setDirectoriesList((prev) =>
+            prev.filter((d) => String(d._id || d.id) !== itemId),
+          );
+        else
+          setFilesList((prev) =>
+            prev.filter((f) => String(f._id || f.id) !== itemId),
+          );
+      }
       await refreshUser();
-      dirCache.delete(cacheKey);
-      addToast(`"${item.name}" has been deleted`, "success");
+      toast.success(`"${item.name}" has been deleted`);
     } catch (err) {
-      addToast(getErr(err), "error");
-      loadDirectory({ force: true, silent: true });
+      toast.error(getErr(err));
+      if (dirIdRef.current === actionDirId)
+        loadDirectory({ force: true, silent: true });
     } finally {
       dropLoadingItem(itemId);
     }
@@ -350,17 +421,20 @@ useEffect(() => {
 
   async function handleCreateDirectory(e) {
     e.preventDefault();
+    const actionDirId = dirId;
+    const actionCacheKey = cacheKey;
     setCreateLoading(true);
     try {
       await createDirectory(dirId, newDirname);
       const name = newDirname;
       setNewDirname("New Folder");
       setShowCreateDir(false);
-      dirCache.delete(cacheKey);
-      loadDirectory({ force: true, silent: true });
-      addToast(`"${name}" folder created`, "success");
+      dirCache.delete(actionCacheKey);
+      if (dirIdRef.current === actionDirId)
+        loadDirectory({ force: true, silent: true });
+      toast.success(`"${name}" folder created`);
     } catch (err) {
-      addToast(getErr(err), "error");
+      toast.error(getErr(err));
     } finally {
       setCreateLoading(false);
     }
@@ -368,16 +442,20 @@ useEffect(() => {
 
   async function handleRenameSubmit(e) {
     e.preventDefault();
+    const actionDirId = dirId;
+    const actionCacheKey = cacheKey;
     setRenameLoading(true);
     try {
-      if (renameTarget.type === "file") await renameFile(renameTarget.id, renameTarget.value);
+      if (renameTarget.type === "file")
+        await renameFile(renameTarget.id, renameTarget.value);
       else await renameDirectory(renameTarget.id, renameTarget.value);
       setShowRename(false);
-      dirCache.delete(cacheKey);
-      loadDirectory({ force: true, silent: true });
-      addToast(`Renamed to "${renameTarget.value}"`, "success");
+      dirCache.delete(actionCacheKey);
+      if (dirIdRef.current === actionDirId)
+        loadDirectory({ force: true, silent: true });
+      toast.success(`Renamed to "${renameTarget.value}"`);
     } catch (err) {
-      addToast(getErr(err), "error");
+      toast.error(getErr(err));
     } finally {
       setRenameLoading(false);
     }
@@ -386,23 +464,35 @@ useEffect(() => {
   async function handleBulkDelete() {
     if (!selectedItems.length) return;
     const count = selectedItems.length;
+    const actionDirId = dirId;
+    const actionBreadcrumbs = breadcrumbs;
     setBulkLoading(true);
     selectedItems.forEach((i) => addLoadingItem(String(i.id || i._id)));
     try {
       await bulkDeleteItems({
-        fileIds: selectedItems.filter((i) => !i.isDirectory).map((i) => i.id || i._id),
-        directoryIds: selectedItems.filter((i) => i.isDirectory).map((i) => i.id || i._id),
+        fileIds: selectedItems
+          .filter((i) => !i.isDirectory)
+          .map((i) => i.id || i._id),
+        directoryIds: selectedItems
+          .filter((i) => i.isDirectory)
+          .map((i) => i.id || i._id),
       });
       setSelectionMode(false);
       setSelectedItems([]);
-      dirCache.delete(cacheKey);
-      await Promise.all([
-        loadDirectory({ force: true, silent: true }),
-        refreshUser(),
-      ]);
-      addToast(`${count} item${count !== 1 ? "s" : ""} deleted`, "success");
+      // Bulk delete changes sizes the same way single delete does —
+      // invalidate this directory's cache and every ancestor's up to root.
+      invalidateDirAndAncestors(user?.id, actionDirId, actionBreadcrumbs);
+      if (dirIdRef.current === actionDirId) {
+        await Promise.all([
+          loadDirectory({ force: true, silent: true }),
+          refreshUser(),
+        ]);
+      } else {
+        await refreshUser();
+      }
+      toast.success(`${count} item${count !== 1 ? "s" : ""} deleted`);
     } catch (err) {
-      addToast(getErr(err), "error");
+      toast.error(getErr(err));
     } finally {
       setBulkLoading(false);
       selectedItems.forEach((i) => dropLoadingItem(String(i.id || i._id)));
@@ -421,19 +511,29 @@ useEffect(() => {
         (i) => String(i._id || i.id) === String(item._id || item.id),
       );
       return exists
-        ? prev.filter((i) => String(i._id || i.id) !== String(item._id || item.id))
+        ? prev.filter(
+            (i) => String(i._id || i.id) !== String(item._id || item.id),
+          )
         : [...prev, item];
     });
   }, []);
 
-  const handleItemClick = useCallback((item) => {
-    if (selectionMode) {
-      toggleSelect(item);
-      return;
-    }
-    if (item.isDirectory) navigate(`/directory/${item._id || item.id}`);
-    else window.open(`${BASE_URL}/file/${item._id || item.id}`, "_blank");
-  }, [selectionMode, toggleSelect, navigate]);
+  const handleItemClick = useCallback(
+    (item) => {
+      if (selectionMode) {
+        toggleSelect(item);
+        return;
+      }
+      if (item.isDirectory) navigate(`/directory/${item._id || item.id}`);
+      else
+        window.open(
+          `${BASE_URL}/file/${item._id || item.id}`,
+          "_blank",
+          "noopener,noreferrer",
+        );
+    },
+    [selectionMode, toggleSelect, navigate],
+  );
 
   const openRename = useCallback((item) => {
     setRenameTarget({
@@ -446,22 +546,33 @@ useEffect(() => {
 
   // ── sort ───────────────────────────────────────────────────────────────────
   function handleSort(field, direction) {
+    if (field === null) {
+      setSortBy(null);
+      setSortDir("asc");
+      return;
+    }
+
     if (direction) {
       setSortDir(direction);
-    } else if (sortBy === field) {
+      return;
+    }
+
+    if (sortBy === field) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortBy(field);
       setSortDir("asc");
     }
-    if (field && field !== sortBy) setSortBy(field);
   }
 
   // ── derived data ───────────────────────────────────────────────────────────
-  const realItems = useMemo(() => [
-    ...directoriesList.map((d) => ({ ...d, isDirectory: true })),
-    ...filesList.map((f) => ({ ...f, isDirectory: false })),
-  ], [directoriesList, filesList]);
+  const realItems = useMemo(
+    () => [
+      ...directoriesList.map((d) => ({ ...d, isDirectory: true })),
+      ...filesList.map((f) => ({ ...f, isDirectory: false })),
+    ],
+    [directoriesList, filesList],
+  );
 
   const q = searchQuery.trim().toLowerCase();
 
@@ -469,6 +580,9 @@ useEffect(() => {
     const filtered = q
       ? realItems.filter((i) => i.name?.toLowerCase().includes(q))
       : realItems;
+
+    if (!sortBy) return filtered;
+
     return [...filtered].sort((a, b) => {
       if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
       let av, bv;
@@ -495,21 +609,34 @@ useEffect(() => {
   }, [realItems, q, sortBy, sortDir]);
 
   const totalItems = useMemo(
-    () => directoriesList.length + filesList.filter((f) => !f.id?.startsWith("temp-")).length,
-    [directoriesList, filesList]
+    () =>
+      directoriesList.length +
+      filesList.filter((f) => !f.id?.startsWith("temp-")).length,
+    [directoriesList, filesList],
   );
 
-  const itemProps = useMemo(() => ({
-    selectionMode,
-    selectedIds,
-    toggleSelect,
-    handleItemClick,
-    openRename,
-    setDeleteItem,
-    setDetailsItem,
-    loadingItems,
-    progressMap,
-  }), [selectionMode, selectedIds, toggleSelect, handleItemClick, openRename, setDeleteItem, setDetailsItem, loadingItems, progressMap]);
+  const itemProps = useMemo(
+    () => ({
+      selectionMode,
+      selectedIds,
+      toggleSelect,
+      handleItemClick,
+      openRename,
+      setDeleteItem,
+      setDetailsItem,
+      loadingItems,
+    }),
+    [
+      selectionMode,
+      selectedIds,
+      toggleSelect,
+      handleItemClick,
+      openRename,
+      setDeleteItem,
+      setDetailsItem,
+      loadingItems,
+    ],
+  );
 
   // ══════════════════════════════════════════════════════════════════════════
   return (
@@ -524,29 +651,32 @@ useEffect(() => {
         }}
       >
         <div style={{ maxWidth: 1200, margin: "0 auto", minWidth: 0 }}>
-
-          <ToastStack toasts={toasts} onRemove={removeToast} />
-
           {/* Upload zone — desktop only */}
           {!isMobile && (
-            <UploadZone
-              isMobile={isMobile}
-              isDragOver={isDragOver}
-              onDragEnter={onDragEnter}
-              onDragLeave={onDragLeave}
-              onDragOver={onDragOver}
-              onDrop={onDrop}
-              onUploadClick={() => fileInputRef.current?.click()}
-              onCreateDir={() => setShowCreateDir(true)}
-            />
+            <>
+              <UploadProgressBar />
+              <UploadZone
+                isMobile={isMobile}
+                isDragOver={isDragOver}
+                onDragEnter={onDragEnter}
+                onDragLeave={onDragLeave}
+                onDragOver={onDragOver}
+                onDrop={onDrop}
+                onUploadClick={() => fileInputRef.current?.click()}
+                onCreateDir={() => setShowCreateDir(true)}
+              />
+            </>
           )}
 
           {/* Mobile bottom action bar */}
           {isMobile && (
-            <MobileActionBar
-              onUploadClick={() => fileInputRef.current?.click()}
-              onCreateDir={() => setShowCreateDir(true)}
-            />
+            <>
+              <MobileActionBar
+                onUploadClick={() => fileInputRef.current?.click()}
+                onCreateDir={() => setShowCreateDir(true)}
+              />
+              <UploadProgressBar />
+            </>
           )}
 
           <DirectoryToolbar
@@ -571,7 +701,12 @@ useEffect(() => {
           <Breadcrumbs breadcrumbs={breadcrumbs} />
 
           {/* File list area */}
-          <div style={{ position: "relative", minHeight: loading ? undefined : 60 }}>
+          <div
+            style={{
+              position: "relative",
+              minHeight: loading ? undefined : 60,
+            }}
+          >
             <ListRefreshOverlay visible={listRefreshing} />
 
             <DirectoryGrid
@@ -600,7 +735,9 @@ useEffect(() => {
         showRename={showRename}
         renameType={renameTarget.type}
         renameValue={renameTarget.value}
-        setRenameValue={(val) => setRenameTarget((prev) => ({ ...prev, value: val }))}
+        setRenameValue={(val) =>
+          setRenameTarget((prev) => ({ ...prev, value: val }))
+        }
         handleRenameSubmit={handleRenameSubmit}
         setShowRename={setShowRename}
         isLoading={renameLoading}
@@ -611,7 +748,11 @@ useEffect(() => {
         confirmDelete={confirmDelete}
       />
       {detailsItem && (
-        <DetailsModal item={detailsItem} onClose={() => setDetailsItem(null)} />
+        <DetailsModal
+          item={detailsItem}
+          breadcrumbs={breadcrumbs}
+          onClose={() => setDetailsItem(null)}
+        />
       )}
 
       <ConfirmDialog
@@ -621,7 +762,10 @@ useEffect(() => {
         message="This will permanently delete the selected files and folders. This cannot be undone."
         confirmLabel="Delete"
         confirmDanger
-        onConfirm={() => { setBulkConfirm(false); handleBulkDelete(); }}
+        onConfirm={() => {
+          setBulkConfirm(false);
+          handleBulkDelete();
+        }}
         onCancel={() => setBulkConfirm(false)}
       />
 

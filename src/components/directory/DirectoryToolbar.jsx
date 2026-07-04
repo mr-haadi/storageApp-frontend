@@ -19,8 +19,13 @@ const DirectoryToolbar = memo(function DirectoryToolbar({
   bulkLoading,
   onBulkConfirm,
 }) {
-  const totalCount = directoriesList.length + filesList.length;
-  const allSelected = selectedItems.length === totalCount;
+  const isTempItem = (item) =>
+    typeof item.id === "string" && item.id.startsWith("temp-");
+  const selectableRealItems = realItems.filter((i) => !isTempItem(i));
+  const totalCount =
+    directoriesList.length + filesList.filter((f) => !isTempItem(f)).length;
+  const allSelected =
+    selectedItems.length === totalCount && totalCount > 0;
 
   return (
     <div
@@ -116,7 +121,7 @@ const DirectoryToolbar = memo(function DirectoryToolbar({
               Delete ({selectedItems.length})
             </button>
             <button
-              onClick={() => setSelectedItems(allSelected ? [] : realItems)}
+              onClick={() => setSelectedItems(allSelected ? [] : selectableRealItems)}
               style={{
                 padding: "6px 12px", background: "var(--surface-hover)",
                 border: "1px solid var(--border)", borderRadius: 6,

@@ -10,6 +10,7 @@ export default function CreateFolderModal({
   handleCreateDirectory,
   isLoading,
 }) {
+  const isDisabled = isLoading || !newDirname.trim();
   const inputRef = useRef(null);
 
   const handleClose = () => {
@@ -71,17 +72,17 @@ export default function CreateFolderModal({
           </button>
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isDisabled}
             style={{
               flex: 1, padding: 10, background: "var(--primary)",
               color: "#fff", border: "none", borderRadius: 8,
               fontSize: 14, fontWeight: 600,
-              cursor: isLoading ? "not-allowed" : "pointer",
+              cursor: isDisabled ? "not-allowed" : "pointer",
               fontFamily: "Inter,sans-serif",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-              opacity: isLoading ? 0.8 : 1,
+              opacity: isDisabled ? 0.6 : 1,
             }}
-            onMouseOver={(e) => !isLoading && (e.currentTarget.style.background = "#2563EB")}
+            onMouseOver={(e) => !isDisabled && (e.currentTarget.style.background = "#2563EB")}
             onMouseOut={(e) => (e.currentTarget.style.background = "var(--primary)")}
           >
             {isLoading && (

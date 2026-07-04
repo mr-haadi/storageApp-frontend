@@ -27,6 +27,12 @@ body {
   min-height: 100vh;
 }
 
+@media (max-width: 435px) {
+  .desktop-only {
+    display: none;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 6px;
 }

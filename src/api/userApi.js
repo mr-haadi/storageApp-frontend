@@ -1,7 +1,10 @@
 import { axiosWithCreds, axiosWithoutCreds } from "./axiosInstances";
 
 export const fetchUser = async () => {
-  const { data } = await axiosWithCreds.get("/user");
+  // skipAuthRedirect: a 401 here just means "not logged in yet", which
+  // UserProvider/PrivateRoute already handle — it isn't a mid-session
+  // expiry, so it shouldn't trigger the global redirect-to-login.
+  const { data } = await axiosWithCreds.get("/user", { skipAuthRedirect: true });
   return data;
 };
 

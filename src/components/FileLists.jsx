@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useCallback, useSyncExternalStore } from "react";
 import { BASE_URL } from "../api/axiosInstances";
 import {
   formatDate,
@@ -7,7 +7,18 @@ import {
   getFileEmoji,
   getFolderMeta,
 } from "../utils/directoryUtils";
+import { subscribeItem, getItemProgress } from "../utils/uploadManager";
 import ThreeDotMenu from "./ThreeDotMenu";
+
+// ── Live progress for a single temp (uploading) item ───────────────────────
+function useItemProgress(id, active) {
+  const subscribeFn = useCallback(
+    (cb) => (active ? subscribeItem(id, cb) : () => {}),
+    [id, active],
+  );
+  const getSnap = useCallback(() => (active ? getItemProgress(id) : 0), [id, active]);
+  return useSyncExternalStore(subscribeFn, getSnap);
+}
 
 // ── Inline spinner component ──────────────────────────────────────────────
 function ItemSpinner() {
@@ -50,29 +61,32 @@ export const FileRow = memo(function FileRow({
   toggleSelect,
   selectionMode,
   loadingItems,
-  progressMap,
 }) {
   const ext = getExt(item.name);
   const emoji = item.isDirectory ? "📁" : getFileEmoji(ext);
   const selected = selectedIds?.has(String(item._id || item.id)) ?? false;
   const isLoading = loadingItems?.has(String(item._id || item.id));
-  const isUploading = item.id?.startsWith("temp-");
-  const uploadPct = isUploading ? progressMap?.[item.id] || 0 : null;
+  const isUploading = typeof item.id === "string" && item.id.startsWith("temp-");
+  const uploadPct = useItemProgress(item.id, isUploading);
+  const disabled = isLoading || isUploading;
 
   return (
     <div
-      onClick={() => !isLoading && handleItemClick(item)}
+      onClick={() => !disabled && handleItemClick(item)}
+      onContextMenu={(e) => {
+        if (isUploading) e.preventDefault();
+      }}
       style={{
         display: "flex",
         alignItems: "center",
         gap: 10,
         padding: "10px 14px",
         borderBottom: "1px solid var(--border)",
-        cursor: isLoading || isUploading ? "default" : "pointer",
+        cursor: isUploading ? "progress" : isLoading ? "default" : "pointer",
         background: selected ? "rgba(59,130,246,0.08)" : "transparent",
         transition: "background 0.1s",
         position: "relative",
-        opacity: isLoading ? 0.7 : 1,
+        opacity: isLoading ? 0.7 : isUploading ? 0.6 : 1,
       }}
       onMouseOver={(e) =>
         !selected &&
@@ -119,7 +133,7 @@ export const FileRow = memo(function FileRow({
         <div
           onClick={(e) => {
             e.stopPropagation();
-            if (!isLoading) toggleSelect(item);
+            if (!disabled) toggleSelect(item);
           }}
           style={{
             width: 16,
@@ -190,22 +204,24 @@ export const FileRow = memo(function FileRow({
       </span>
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ flexShrink: 0, visibility: isLoading ? "hidden" : "visible" }}
+        style={{ flexShrink: 0, visibility: disabled ? "hidden" : "visible" }}
       >
-        <ThreeDotMenu
-          item={item}
-          onRename={() => openRename(item)}
-          onDelete={() => setDeleteItem(item)}
-          onDetails={() => setDetailsItem(item)}
-          onDownload={() => {
-            const a = document.createElement("a");
-            a.href = `${BASE_URL}/file/${item._id || item.id}?action=download`;
-            a.download = item.name || "";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-          }}
-        />
+        {!isUploading && (
+          <ThreeDotMenu
+            item={item}
+            onRename={() => openRename(item)}
+            onDelete={() => setDeleteItem(item)}
+            onDetails={() => setDetailsItem(item)}
+            onDownload={() => {
+              const a = document.createElement("a");
+              a.href = `${BASE_URL}/file/${item._id || item.id}?action=download`;
+              a.download = item.name || "";
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            }}
+          />
+        )}
       </div>
     </div>
   );
@@ -222,29 +238,32 @@ export const FileCard = memo(function FileCard({
   toggleSelect,
   selectionMode,
   loadingItems,
-  progressMap,
 }) {
   const ext = getExt(item.name);
   const emoji = item.isDirectory ? "📁" : getFileEmoji(ext);
   const selected = selectedIds?.has(String(item._id || item.id)) ?? false;
   const isLoading = loadingItems?.has(String(item._id || item.id));
-  const isUploading = item.id?.startsWith("temp-");
-  const uploadPct = isUploading ? progressMap?.[item.id] || 0 : null;
+  const isUploading = typeof item.id === "string" && item.id.startsWith("temp-");
+  const uploadPct = useItemProgress(item.id, isUploading);
+  const disabled = isLoading || isUploading;
 
   return (
     <div
-      onClick={() => !isLoading && handleItemClick(item)}
+      onClick={() => !disabled && handleItemClick(item)}
+      onContextMenu={(e) => {
+        if (isUploading) e.preventDefault();
+      }}
       style={{
         background: selected ? "rgba(59,130,246,0.12)" : "var(--surface)",
         border: `1px solid ${selected ? "rgba(59,130,246,0.45)" : isUploading ? "rgba(59,130,246,0.3)" : "var(--border)"}`,
         borderRadius: 10,
         padding: "14px 12px 12px",
-        cursor: isLoading || isUploading ? "default" : "pointer",
+        cursor: isUploading ? "progress" : isLoading ? "default" : "pointer",
         transition: "all 0.15s",
         position: "relative",
         display: "flex",
         flexDirection: "column",
-        opacity: isLoading ? 0.75 : 1,
+        opacity: isLoading ? 0.75 : isUploading ? 0.6 : 1,
       }}
       onMouseOver={(e) =>
         !selected &&
@@ -293,7 +312,7 @@ export const FileCard = memo(function FileCard({
         <div
           onClick={(e) => {
             e.stopPropagation();
-            if (!isLoading) toggleSelect(item);
+            if (!disabled) toggleSelect(item);
           }}
           style={{
             position: "absolute",
@@ -321,24 +340,26 @@ export const FileCard = memo(function FileCard({
           top: 8,
           right: 8,
           zIndex: 20,
-          visibility: isLoading ? "hidden" : "visible",
+          visibility: disabled ? "hidden" : "visible",
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <ThreeDotMenu
-          item={item}
-          onRename={() => openRename(item)}
-          onDelete={() => setDeleteItem(item)}
-          onDetails={() => setDetailsItem(item)}
-          onDownload={() => {
-            const a = document.createElement("a");
-            a.href = `${BASE_URL}/file/${item._id || item.id}?action=download`;
-            a.download = item.name || "";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-          }}
-        />
+        {!isUploading && (
+          <ThreeDotMenu
+            item={item}
+            onRename={() => openRename(item)}
+            onDelete={() => setDeleteItem(item)}
+            onDetails={() => setDetailsItem(item)}
+            onDownload={() => {
+              const a = document.createElement("a");
+              a.href = `${BASE_URL}/file/${item._id || item.id}?action=download`;
+              a.download = item.name || "";
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            }}
+          />
+        )}
       </div>
       <div
         style={{

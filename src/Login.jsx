@@ -288,7 +288,7 @@ export default function Login() {
           >
             Terms of Service
           </Link>
-            . and acknowledge that you have read our{" "}<br/>
+            . and acknowledge that you have read our{" "}< br className="desktop-only" />
           <Link
             to="/privacy"
             style={{

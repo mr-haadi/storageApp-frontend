@@ -11,7 +11,8 @@ import {
 import { useUser } from "../context/UserContext.jsx";
 import AppLayout from "../components/AppLayout.jsx";
 import { getErr } from "../utils/directoryUtils.js";
-import ToastMessage from "../components/admin/usersPage/ToastMessage.jsx";
+import { logError } from "../utils/logger.js";
+import toast from "react-hot-toast";
 import UserStats from "../components/admin/usersPage/UserStats.jsx";
 import UserFilters from "../components/admin/usersPage/UserFilters.jsx";
 import UserTable from "../components/admin/usersPage/UserTable.jsx";
@@ -29,7 +30,6 @@ export default function AdminUsersPage() {
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const [searchQ, setSearchQ] = useState("");
   const [filterRole, setFilterRole] = useState("all");
-  const [toast, setToast] = useState("");
   const [listRefreshing, setListRefreshing] = useState(false);
 
   const navigate = useNavigate();
@@ -40,12 +40,6 @@ export default function AdminUsersPage() {
   const userEmail = currentLoggedUser?.email;
   const canManageUsers = isSuperAdmin || isAdmin;
   const [logoutTarget, setLogoutTarget] = useState(null);
-
-  const showToast = (msg) => {
-    setToast(msg);
-    clearTimeout(window.toastTimer);
-    window.toastTimer = setTimeout(() => setToast(""), 3000);
-  };
 
   async function fetchUsers() {
     try {
@@ -65,9 +59,9 @@ export default function AdminUsersPage() {
       setListRefreshing(true);
       const data = await fetchAllUsers();
       setUsers(data);
-      showToast("Users refreshed");
+      toast.success("Users refreshed");
     } catch (err) {
-      showToast(getErr(err));
+      toast.error(getErr(err));
     } finally {
       setListRefreshing(false);
     }
@@ -99,10 +93,10 @@ export default function AdminUsersPage() {
         return;
       }
       await refreshUsers();
-      showToast(`${logoutTarget.email} logged out`);
+      toast.success(`${logoutTarget.email} logged out`);
     } catch (err) {
-      console.error(err);
-      showToast(getErr(err));
+      logError(err);
+      toast.error(getErr(err));
     } finally {
       setLogoutTarget(null);
     }
@@ -114,10 +108,10 @@ export default function AdminUsersPage() {
       else await hardDeleteUserByAdmin(deleteTarget.id);
       setDeleteTarget(null);
       await refreshUsers();
-      showToast("User deleted");
+      toast.success("User deleted");
     } catch (err) {
-      console.error(err);
-      showToast(getErr(err));
+      logError(err);
+      toast.error(getErr(err));
     }
   };
 
@@ -125,10 +119,10 @@ export default function AdminUsersPage() {
     try {
       await recoverUserByAdmin(id);
       await refreshUsers();
-      showToast(`${email} recovered`);
+      toast.success(`${email} recovered`);
     } catch (err) {
-      console.error(err);
-      showToast(getErr(err));
+      logError(err);
+      toast.error(getErr(err));
     }
   };
 
@@ -136,10 +130,10 @@ export default function AdminUsersPage() {
     try {
       await updateUserRoleByAdmin(u.id, role);
       await refreshUsers();
-      showToast(`${u.email} → ${role}`);
+      toast.success(`${u.email} → ${role}`);
     } catch (err) {
-      console.error(err);
-      showToast(getErr(err));
+      logError(err);
+      toast.error(getErr(err));
     }
   };
 
@@ -172,8 +166,6 @@ export default function AdminUsersPage() {
     <AppLayout>
       <div style={{ padding: "24px 24px", minWidth: 0 }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-          <ToastMessage message={toast} />
-
           {/* Header */}
           <div style={{ marginBottom: 24 }}>
             <h1

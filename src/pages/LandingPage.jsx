@@ -53,7 +53,6 @@ const plans = [
     emoji: "🆓",
     features: [
       "500 MB cloud storage",
-      "Up to 3 shared folders",
       "Access from 1 device",
       "Basic file types",
       "Community support",
@@ -220,7 +219,7 @@ export default function LandingPage() {
                 />
               ))}
             </div>
-            <div className="landing-preview-url">haadi.cloud/drive</div>
+            <div className="landing-preview-url">mirhaadi.in/directory</div>
           </div>
           <img
             src={dashboardPreview}

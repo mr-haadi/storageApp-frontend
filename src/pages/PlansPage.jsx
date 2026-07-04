@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import AppLayout from "../components/AppLayout";
 import { useUser } from "../context/UserContext";
 import { formatStorage } from "../utils/directoryUtils";
+import { logError } from "../utils/logger";
+import toast from "react-hot-toast";
 import {
   createSubscription,
   getActiveSubscription,
@@ -151,46 +153,6 @@ function fmtAmount(amount) {
 }
 
 // ─── Toast (new UI style) ─────────────────────────────────────────────────────
-
-function Toast({ type, message, onClose }) {
-  useEffect(() => {
-    const t = setTimeout(onClose, 6000);
-    return () => clearTimeout(t);
-  }, [onClose]);
-
-  const colors = {
-    success: { bg: "rgba(52,211,153,0.1)", border: "rgba(52,211,153,0.25)", text: "#34D399", icon: "✓" },
-    error:   { bg: "rgba(239,68,68,0.1)",  border: "rgba(239,68,68,0.25)",  text: "#FCA5A5", icon: "✕" },
-    warning: { bg: "rgba(245,158,11,0.1)", border: "rgba(245,158,11,0.25)", text: "#FCD34D", icon: "!" },
-  };
-  const c = colors[type] || colors.error;
-
-  return (
-    <div
-      role="alert"
-      style={{
-        position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)",
-        zIndex: 100, display: "flex", alignItems: "flex-start", gap: 10,
-        maxWidth: 420, width: "calc(100vw - 32px)",
-        background: c.bg, border: `1px solid ${c.border}`,
-        borderRadius: 12, padding: "12px 14px",
-        boxShadow: "0 8px 30px rgba(0,0,0,0.4)",
-      }}
-    >
-      <span style={{
-        width: 20, height: 20, borderRadius: "50%", background: c.border,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 11, fontWeight: 700, color: c.text, flexShrink: 0, marginTop: 1,
-      }}>{c.icon}</span>
-      <p style={{ fontSize: 13, color: c.text, lineHeight: 1.5, flex: 1 }}>{message}</p>
-      <button
-        onClick={onClose}
-        style={{ background: "none", border: "none", color: c.text, fontSize: 18,
-          cursor: "pointer", lineHeight: 1, flexShrink: 0, opacity: 0.6, padding: 0 }}
-      >×</button>
-    </div>
-  );
-}
 
 // ─── Loading Overlay (new UI style) ──────────────────────────────────────────
 
@@ -664,8 +626,8 @@ function StorageBar({ user, activeSubscription, premiumActive }) {
 
 function CancelConfirmModal({ plan, endDate, onConfirm, onClose, loading }) {
   const consequences = [
-    { icon: "📦", text: `Storage drops to 1 GB (Free tier) at end of billing period.` },
-    { icon: "🔒", text: "Files exceeding 1 GB will become inaccessible (deleted)." },
+    { icon: "📦", text: `Storage drops to 500 MB (Free tier) at end of billing period.` },
+    { icon: "🔒", text: "Files exceeding free tier limit will become inaccessible (deleted)." },
     { icon: "📅", text: `Premium access continues until your billing period ends${endDate ? ` (${endDate})` : ""}.` },
     { icon: "💸", text: "No refund for the current billing period — you keep access until it ends." },
   ];
@@ -752,13 +714,11 @@ export default function PlansPage() {
   const [mode, setMode] = useState("monthly");
   const [loadingId, setLoadingId] = useState(null);
   const [overlayPhase, setOverlayPhase] = useState(null);
-  const [toast, setToast] = useState(null);
   const [activeSubscription, setActiveSubscription] = useState(null);
   const [premiumActive, setPremiumActive] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [subLoading, setSubLoading] = useState(true);
-  const toastIdRef = useRef(0);
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -769,7 +729,16 @@ export default function PlansPage() {
   const plans = PLAN_CATALOG[mode];
 
   const showToast = useCallback((type, message) => {
-    if (mounted.current) setToast({ id: ++toastIdRef.current, type, message });
+    if (type === "success") return toast.success(message);
+    if (type === "error") return toast.error(message);
+    return toast(message, {
+      icon: "⚠️",
+      style: {
+        background: "#1F2937",
+        border: "1px solid rgba(245,158,11,0.35)",
+        color: "#F9FAFB",
+      },
+    });
   }, []);
 
   const refreshSubscription = useCallback(async () => {
@@ -781,7 +750,7 @@ export default function PlansPage() {
       }
       return data;
     } catch (err) {
-      console.error("refreshSubscription failed:", err);
+      logError("refreshSubscription failed:", err);
       return null;
     }
   }, []);
@@ -938,14 +907,6 @@ export default function PlansPage() {
           onConfirm={confirmCancelPlan}
           onClose={() => !cancelLoading && setShowCancelModal(false)}
           loading={cancelLoading}
-        />
-      )}
-      {toast && (
-        <Toast
-          key={toast.id}
-          type={toast.type}
-          message={toast.message}
-          onClose={() => setToast(null)}
         />
       )}
 

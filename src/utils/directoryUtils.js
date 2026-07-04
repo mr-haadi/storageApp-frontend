@@ -14,6 +14,14 @@ export function formatSize(bytes) {
   return (bytes / 1024).toFixed(0) + " KB";
 }
 
+export function formatSpeed(bytesPerSec) {
+  if (!bytesPerSec || bytesPerSec <= 0) return "";
+  if (bytesPerSec >= 1024 ** 3) return (bytesPerSec / 1024 ** 3).toFixed(1) + " GB/s";
+  if (bytesPerSec >= 1024 ** 2) return (bytesPerSec / 1024 ** 2).toFixed(1) + " MB/s";
+  if (bytesPerSec >= 1024) return (bytesPerSec / 1024).toFixed(0) + " KB/s";
+  return Math.round(bytesPerSec) + " B/s";
+}
+
 export function getFolderMeta(item) {
   const count = item.fileCount ?? item.itemCount ?? item.itemsCount ?? 0;
   const size = item.size ?? item.totalSize ?? item.totalSizeInBytes;
@@ -22,10 +30,14 @@ export function getFolderMeta(item) {
 
 export function formatDate(d) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-US", {
+
+  return new Date(d).toLocaleString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
   });
 }
 
@@ -49,7 +61,8 @@ export function getFileEmoji(ext) {
 }
 
 export function getExt(name) {
-  return (name || "").split(".").pop().toLowerCase();
+  if (!name || !name.includes(".")) return "";
+  return name.split(".").pop().toLowerCase();
 }
 
 export function getErr(err) {

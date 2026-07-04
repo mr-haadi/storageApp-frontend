@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useUser } from "../context/UserContext";
 import { logoutUser } from "../api/userApi";
 import { formatStorage } from "../utils/directoryUtils";
+import { logError } from "../utils/logger";
 
 // ── NavLink — memoized so it only re-renders when active state changes ────
 const NavLink = memo(function NavLink({ item, active }) {
@@ -157,7 +158,7 @@ export default function AppLayout({ children, fileInputRef, handleFileSelect }) 
       setUser(null);
       navigate("/login");
     } catch (e) {
-      console.error(e);
+      logError(e);
     }
   }, [setUser, navigate]);
 
