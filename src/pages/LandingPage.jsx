@@ -3,7 +3,6 @@ import { useState } from "react";
 import { useUser } from "../context/UserContext";
 import "../landing.css";
 
-
 import dashboardPreview from "../assets/dashboard-preview.png";
 
 const features = [
