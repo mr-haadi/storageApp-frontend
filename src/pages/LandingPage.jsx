@@ -3,9 +3,7 @@ import { useState } from "react";
 import { useUser } from "../context/UserContext";
 import "../landing.css";
 
-// Import the dashboard screenshot (user must place it at src/assets/dashboard-preview.png)
-// We use a relative URL so Vite bundles it. If the image doesn't exist yet it
-// gracefully falls back to the plain dark background colour.
+
 import dashboardPreview from "../assets/dashboard-preview.png";
 
 const features = [
