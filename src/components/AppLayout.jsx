@@ -15,7 +15,7 @@ import { logoutUser } from "../api/userApi";
 import { formatStorage } from "../utils/directoryUtils";
 import { logError } from "../utils/logger";
 
-// ── NavLink — memoized so it only re-renders when active state changes ────
+// ── NavLink — memoized so it only re-renders when active state changes ───
 const NavLink = memo(function NavLink({ item, active }) {
   return (
     <Link
