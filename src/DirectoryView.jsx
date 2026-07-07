@@ -39,7 +39,7 @@ import * as uploadManager from "./utils/uploadManager";
 // ── Module-level cache — survives navigation (unmount/remount) ────────────
 const dirCache = new Map();
 
-// ── Invalidate a directory's cache plus every ancestor up to root ─────────
+// ── Invalidate a directory's cache plus every ancestor up to root ────────
 function invalidateDirAndAncestors(userId, targetDirId, breadcrumbs) {
   if (!userId) return;
   dirCache.delete(`${userId}:root`);
