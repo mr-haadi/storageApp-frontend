@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import "../landing.css";
 
-import dashboardPreview from "../assets/dashboard-preview.png";
+import dashboardPreview from "../assets/dashboard-preview.webp";
 
 const features = [
   {
@@ -59,14 +59,15 @@ const plans = [
     name: "Free",
     price: "₹0",
     period: "/month",
-    storage: "500 MB",
+    storage: "512 MB",
     color: "#6B7280",
     badge: null,
     emoji: Gift,
     features: [
-      "500 MB cloud storage",
+      "512 MB cloud storage",
       "Access from 1 device",
-      "Basic file types",
+      "No size limits",
+      "Upload limits: 20 files at a time",
       "Community support",
     ],
   },
@@ -84,7 +85,7 @@ const plans = [
       "Unlimited shared folders",
       "Access from up to 3 device",
       "All file types",
-      "community and email support",
+      "Community and email support",
     ],
   },
   {
@@ -100,7 +101,7 @@ const plans = [
       "500 GB cloud storage",
       "Unlimited everything",
       "Access from up to 4 device",
-      "All platforms",
+      "Everything in pro",
       "Priority upload",
       "24/7 priority support",
     ],
@@ -428,9 +429,9 @@ export default function LandingPage() {
       {/* ── CTA ── */}
       <section className="landing-cta">
         <div className="landing-cta-box">
-          <h2 className="landing-cta-title">Ready to store your files?</h2>
+          <h2 className="landing-cta-title">Store your files securely</h2>
           <p className="landing-cta-desc">
-            Create your free account and start uploading in minutes.
+            Create your free account today and experience fast uploads, secure cloud storage, and access from anywhere, on any device.
           </p>
           <Link to="/register" className="landing-btn-primary">
             Create Free Account

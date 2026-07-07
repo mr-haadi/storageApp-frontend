@@ -9,7 +9,7 @@ const sections = [
   },
   {
     title: "2. What We Provide",
-    content: `Haadi Cloud is a personal cloud storage service. We provide a web-based interface to upload, organise, and access your files. Free accounts receive 512 MB of storage. Paid plans (Pro — 100 GB at ₹149/month; Premium — 500 GB at ₹599/month, with annual options) provide expanded storage and priority features. Features are described on the Subscription page and may be updated over time.`,
+    content: `Haadi Cloud is a personal cloud storage service. We provide a web-based interface to upload, organise, and access your files. Free accounts receive 512 MB of storage. Paid plans (Pro — 100 GB at ₹169/month; Premium — 500 GB at ₹499/month, with annual options) provide expanded storage and priority features. Features are described on the Subscription page and may be updated over time.`,
   },
   {
     title: "3. Account Registration",

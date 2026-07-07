@@ -33,13 +33,13 @@ const FREE_PLAN_MONTHLY = {
   razorpayId: null,
   name: "Free",
   tagline: "Always free",
-  storage: "500 MB",
+  storage: "512 MB",
   storageBytes: 0.5 * 1024 ** 3,
   price: "₹0",
   period: "/mo",
   color: "#6B7280",
   emoji: Gift,
-  features: ["500 MB cloud storage", "Access from 1 device", "Basic file types", "Web access"],
+  features: ["512 MB cloud storage", "Access from 1 device", "No size limits", "Upload limit: 20 files at a time", "Basic support"],
   isFree: true,
 };
 
@@ -48,13 +48,13 @@ const FREE_PLAN_YEARLY = {
   razorpayId: null,
   name: "Free",
   tagline: "Always free",
-  storage: "500 MB",
+  storage: "512 MB",
   storageBytes: 0.5 * 1024 ** 3,
   price: "₹0",
   period: "/yr",
   color: "#6B7280",
   emoji: Gift,
-  features: ["500 MB cloud storage", "Access from 1 device", "Basic file types", "Web access"],
+  features: ["512 MB cloud storage", "Access from 1 device", "Upload limits: 20 files at a time", "Basic support"],
   isFree: true,
 };
 

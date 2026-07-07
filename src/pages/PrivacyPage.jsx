@@ -21,7 +21,7 @@ const sections = [
   },
   {
     title: "5. Subscriptions & Payments",
-    content: `Paid plans (Pro at ₹149/month and Premium at ₹599/month) are processed by Razorpay, our payment partner. We do not store your card number or payment credentials — Razorpay handles all payment data under their own PCI-DSS-compliant security practices. We receive transaction records, plan identifiers, and billing-cycle dates from Razorpay to manage your subscription status and storage limits.`,
+    content: `Paid plans (Pro at ₹169/month and Premium at ₹499/month) are processed by Razorpay, our payment partner. We do not store your card number or payment credentials — Razorpay handles all payment data under their own PCI-DSS-compliant security practices. We receive transaction records, plan identifiers, and billing-cycle dates from Razorpay to manage your subscription status and storage limits.`,
   },
   {
     title: "6. Data Sharing",
@@ -45,7 +45,7 @@ const sections = [
   },
   {
     title: "11. Contact Us",
-    content: `If you have any questions about this Privacy Policy or our data practices, please contact us at privacy@haadi.cloud. We are committed to addressing your concerns promptly and transparently.`,
+    content: `If you have any questions about this Privacy Policy or our data practices, please contact us at contact@mirhaadi.in. We are committed to addressing your concerns promptly and transparently.`,
   },
 ];
 
