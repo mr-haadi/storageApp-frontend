@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { Search, LayoutGrid, List as ListIcon } from "lucide-react";
 import SortDropdown from "../SortDropdown";
 
 const DirectoryToolbar = memo(function DirectoryToolbar({
@@ -43,9 +44,10 @@ const DirectoryToolbar = memo(function DirectoryToolbar({
           style={{
             position: "absolute", left: 10, top: "50%",
             transform: "translateY(-50%)", color: "var(--muted)", fontSize: 14,
+            display: "flex",
           }}
         >
-          🔍
+          <Search size={14} aria-hidden="true" />
         </span>
         <input
           type="text"
@@ -69,10 +71,11 @@ const DirectoryToolbar = memo(function DirectoryToolbar({
 
         {/* View toggle */}
         <div style={{ display: "flex", gap: 3 }}>
-          {[["grid", "⊞"], ["list", "☰"]].map(([mode, icon]) => (
+          {[["grid", LayoutGrid], ["list", ListIcon]].map(([mode, Icon]) => (
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
+              aria-label={mode === "grid" ? "Grid view" : "List view"}
               style={{
                 width: 32, height: 32, borderRadius: 6,
                 border: "1px solid var(--border)",
@@ -82,7 +85,7 @@ const DirectoryToolbar = memo(function DirectoryToolbar({
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}
             >
-              {icon}
+              <Icon size={16} aria-hidden="true" />
             </button>
           ))}
         </div>

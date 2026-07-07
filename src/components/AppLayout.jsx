@@ -9,6 +9,8 @@ import {
   Menu,
   User,
   ChevronDown,
+  LogOut,
+  CircleUserRound,
 } from "lucide-react";
 import { useUser } from "../context/UserContext";
 import { logoutUser } from "../api/userApi";
@@ -128,6 +130,24 @@ const NAV_ITEMS = [
 const ADMIN_ITEMS = [
   { label: "Users", icon: Users, href: "/admin/users" },
   { label: "Plans", icon: ChartColumn, href: "/admin/plans" },
+];
+
+const USER_MENU_ITEMS = [
+  {
+    label: "Profile",
+    href: "/profile",
+    icon: CircleUserRound,
+  },
+  {
+    label: "Settings",
+    href: "/settings",
+    icon: Settings,
+  },
+  {
+    label: "Subscription",
+    href: "/subscription",
+    icon: CreditCard,
+  },
 ];
 
 // ── Page title lookup (computed once, not inside render) ──────────────────
@@ -511,7 +531,12 @@ export default function AppLayout({
                   </div>
                 </div>
                 <span
-                  style={{ fontSize: 10, color: "var(--muted)", marginLeft: 2, display: "flex" }}
+                  style={{
+                    fontSize: 10,
+                    color: "var(--muted)",
+                    marginLeft: 2,
+                    display: "flex",
+                  }}
                 >
                   <ChevronDown size={12} aria-hidden="true" />
                 </span>
@@ -581,17 +606,15 @@ export default function AppLayout({
                       </div>
                     )}
                   </div>
-                  {[
-                    ["Profile", "/profile"],
-                    ["Settings", "/settings"],
-                    ["Subscription", "/subscription"],
-                  ].map(([label, href]) => (
+                  {USER_MENU_ITEMS.map((item) => (
                     <Link
-                      key={href}
-                      to={href}
+                      key={item.href}
+                      to={item.href}
                       onClick={() => setUserMenuOpen(false)}
                       style={{
-                        display: "block",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
                         padding: "9px 16px",
                         fontSize: 13,
                         color: "var(--text)",
@@ -605,7 +628,8 @@ export default function AppLayout({
                         (e.currentTarget.style.background = "transparent")
                       }
                     >
-                      {label}
+                      <item.icon size={16} aria-hidden="true" />
+                      <span>{item.label}</span>
                     </Link>
                   ))}
                   <div style={{ borderTop: "1px solid var(--border)" }}>
@@ -621,6 +645,10 @@ export default function AppLayout({
                         textAlign: "left",
                         cursor: "pointer",
                         fontFamily: "Inter,sans-serif",
+
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
                       }}
                       onMouseOver={(e) =>
                         (e.currentTarget.style.background =
@@ -630,7 +658,10 @@ export default function AppLayout({
                         (e.currentTarget.style.background = "none")
                       }
                     >
-                      Sign Out
+                      <>
+                        <LogOut size={16} aria-hidden="true" />
+                        <span>Sign Out</span>
+                      </>
                     </button>
                   </div>
                 </div>

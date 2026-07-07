@@ -8,6 +8,7 @@ export default function UploadProgressBar() {
   const state = useSyncExternalStore(subscribe, getSnapshot);
   const [mounted, setMounted] = useState(false);
   const [entered, setEntered] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   const hideTimerRef = useRef(null);
   // Freeze the last non-idle snapshot so the exit fade shows the final
   // progress/complete/error state instead of flashing back to 0 while
@@ -18,6 +19,8 @@ export default function UploadProgressBar() {
 
   useEffect(() => {
     if (state.phase !== "idle") {
+      setDismissed(false);
+
       if (hideTimerRef.current) {
         clearTimeout(hideTimerRef.current);
         hideTimerRef.current = null;
@@ -28,6 +31,15 @@ export default function UploadProgressBar() {
       );
       return () => cancelAnimationFrame(raf);
     }
+    if (
+      state.phase === "idle" &&
+      (displaySnapshotRef.current.phase === "complete" ||
+        displaySnapshotRef.current.phase === "error")
+    ) {
+      // Keep the toast visible until user dismisses it.
+      return;
+    }
+
     if (mounted) {
       setEntered(false);
       hideTimerRef.current = setTimeout(() => setMounted(false), 260);
@@ -69,32 +81,69 @@ export default function UploadProgressBar() {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              color: isError
-                ? "#F87171"
-                : display.failedFiles > 0
-                  ? "#F59E0B"
-                  : "#10B981",
+              justifyContent: "space-between",
+              gap: 12,
             }}
           >
-            <span style={{ display: "flex" }}>
-              {isError ? (
-                <X size={15} aria-hidden="true" />
-              ) : display.failedFiles > 0 ? (
-                <TriangleAlert size={15} aria-hidden="true" />
-              ) : (
-                <Check size={15} aria-hidden="true" />
-              )}
-            </span>
-            {isError
-              ? display.errorMessage || "Upload failed"
-              : display.failedFiles > 0
-                ? display.completedFiles > 0
-                  ? `${display.completedFiles} uploaded, ${display.failedFiles} failed`
-                  : `${display.failedFiles} file${display.failedFiles !== 1 ? "s" : ""} failed to upload`
-                : "Upload complete"}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                color: isError
+                  ? "#F87171"
+                  : display.failedFiles > 0
+                    ? "#F59E0B"
+                    : "#10B981",
+                minWidth: 0,
+                flex: 1,
+              }}
+            >
+              <span style={{ display: "flex" }}>
+                {isError || display.failedFiles ? (
+                //   <TriangleAlert size={15} />
+                // ) : display.failedFiles > 0 ? (
+                  <TriangleAlert size={15} />
+                ) : (
+                  <Check size={15} />
+                )}
+              </span>
+
+              <span>
+                {isError
+                  ? display.errorMessage || "Upload failed"
+                  : display.failedFiles > 0
+                    ? display.completedFiles > 0
+                      ? `${display.completedFiles} file${display.completedFiles !== 1 ? "s" : ""} uploaded successfully, ${display.failedFiles} file${display.failedFiles !== 1 ? "s" : ""} failed`
+                      : `${display.failedFiles} file${display.failedFiles !== 1 ? "s" : ""} failed to upload`
+                    : "Upload Completed Successfully"}
+              </span>
+            </div>
+
+            <button
+              onClick={() => {
+                setEntered(false);
+                setTimeout(() => {
+                  displaySnapshotRef.current = getSnapshot();
+                  setMounted(false);
+                }, 260);
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--muted)",
+                cursor: "pointer",
+                padding: 4,
+                borderRadius: 6,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <X size={16} />
+            </button>
           </div>
         ) : (
           <>

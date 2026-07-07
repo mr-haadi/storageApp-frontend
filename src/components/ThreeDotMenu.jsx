@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { EllipsisVertical } from "lucide-react";
+import { EllipsisVertical, Download, Pencil, Info, Trash2 } from "lucide-react";
 
 // ── Three-dot menu ────────────────────────────────────────────────────────────
 function ThreeDotMenu({ item, onRename, onDelete, onDetails, onDownload }) {
   const [open, setOpen] = useState(false);
-const [openUp, setOpenUp] = useState(false);
+  const [openUp, setOpenUp] = useState(false);
 
   const ref = useRef(null);
   useEffect(() => {
@@ -16,11 +16,36 @@ const [openUp, setOpenUp] = useState(false);
   }, []);
 
   const actions = [
-    ...(!item.isDirectory ? [{ label: "Download", action: onDownload }] : []),
-    { label: "Rename", action: onRename },
-    { label: "Details", action: onDetails },
+    ...(!item.isDirectory
+      ? [
+          {
+            label: "Download",
+            icon: Download,
+            action: onDownload,
+          },
+        ]
+      : []),
+
+    {
+      label: "Rename",
+      icon: Pencil,
+      action: onRename,
+    },
+
+    {
+      label: "Details",
+      icon: Info,
+      action: onDetails,
+    },
+
     { divider: true },
-    { label: "Delete", action: onDelete, danger: true },
+
+    {
+      label: "Delete",
+      icon: Trash2,
+      action: onDelete,
+      danger: true,
+    },
   ];
 
   return (
@@ -30,17 +55,15 @@ const [openUp, setOpenUp] = useState(false);
       onClick={(e) => e.stopPropagation()}
     >
       <button
-       onClick={(e) => {
-  const rect = e.currentTarget.getBoundingClientRect();
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
 
-  const menuHeight = 180;
+          const menuHeight = 180;
 
-  setOpenUp(
-    rect.bottom + menuHeight > window.innerHeight
-  );
+          setOpenUp(rect.bottom + menuHeight > window.innerHeight);
 
-  setOpen((p) => !p);
-}}
+          setOpen((p) => !p);
+        }}
         style={{
           width: 30,
           height: 30,
@@ -67,22 +90,20 @@ const [openUp, setOpenUp] = useState(false);
       </button>
       {open && (
         <div
-         style={{
-  position: "absolute",
-  right: 0,
+          style={{
+            position: "absolute",
+            right: 0,
 
-  ...(openUp
-    ? { bottom: 34 }
-    : { top: 34 }),
+            ...(openUp ? { bottom: 34 } : { top: 34 }),
 
-  background: "#1a2433",
-  border: "1px solid var(--border)",
-  borderRadius: 10,
-  padding: 4,
-  zIndex: 220,
-  minWidth: 160,
-  boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
-}}
+            background: "#1a2433",
+            border: "1px solid var(--border)",
+            borderRadius: 10,
+            padding: 4,
+            zIndex: 220,
+            minWidth: 160,
+            boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+          }}
         >
           {actions.map((a, i) =>
             a.divider ? (
@@ -123,7 +144,10 @@ const [openUp, setOpenUp] = useState(false);
                 }
                 onMouseOut={(e) => (e.currentTarget.style.background = "none")}
               >
-                {a.label}
+                <>
+                  <a.icon size={15} strokeWidth={2} aria-hidden="true" />
+                  <span>{a.label}</span>
+                </>
               </button>
             ),
           )}

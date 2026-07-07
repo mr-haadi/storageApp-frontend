@@ -33,7 +33,6 @@ import UploadZone from "./components/UploadZone";
 import UploadProgressBar from "./components/UploadProgressBar";
 import DirectoryToolbar from "./components/directory/DirectoryToolbar";
 import MobileActionBar from "./components/directory/MobileActionBar";
-import ListRefreshOverlay from "./components/directory/ListRefreshOverlay";
 import DirectoryGrid from "./components/directory/DirectoryGrid";
 import * as uploadManager from "./utils/uploadManager";
 
@@ -366,9 +365,6 @@ export default function DirectoryView() {
             refreshUser(),
           ]);
         } else {
-          // Uploaded into a folder we've since navigated away from — the
-          // cache entries are already invalidated above, so it (and its
-          // ancestors) will simply refetch next time they're opened.
           await refreshUser();
         }
       }
@@ -709,7 +705,6 @@ export default function DirectoryView() {
               minHeight: loading ? undefined : 60,
             }}
           >
-            <ListRefreshOverlay visible={listRefreshing} />
 
             <DirectoryGrid
               loading={loading}
