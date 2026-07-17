@@ -74,7 +74,7 @@ const plans = [
   {
     id: "pro",
     name: "Pro",
-    price: "₹149",
+    price: "₹169",
     period: "/month",
     storage: "100 GB",
     color: "#3B82F6",
@@ -91,7 +91,7 @@ const plans = [
   {
     id: "premium",
     name: "Premium",
-    price: "₹599",
+    price: "₹499",
     period: "/month",
     storage: "500 GB",
     color: "#8B5CF6",
